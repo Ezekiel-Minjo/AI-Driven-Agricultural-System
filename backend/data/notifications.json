@@ -1,0 +1,29 @@
+[
+  {
+    "id": 1,
+    "type": "sms",
+    "recipient": "+254110454739",
+    "subject": "Alert",
+    "message": "hello",
+    "timestamp": "2025-04-02T22:47:50.867337",
+    "status": "sent"
+  },
+  {
+    "id": 2,
+    "type": "sms",
+    "recipient": "254110454739",
+    "subject": "Alert",
+    "message": "hello",
+    "timestamp": "2025-04-02T22:48:39.014689",
+    "status": "sent"
+  },
+  {
+    "id": 3,
+    "type": "sms",
+    "recipient": "25457160077",
+    "subject": "Alert",
+    "message": "hello\n",
+    "timestamp": "2025-04-02T22:49:17.959794",
+    "status": "sent"
+  }
+]
