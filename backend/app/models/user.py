@@ -35,64 +35,96 @@ def create_user(username, email, password, name, phone=None):
         'updated_at': get_timestamp()
     }
     
-    # Simulated user creation
-    user['_id'] = str(uuid.uuid4())
-    
-    # In a real app, this would save to MongoDB
-    # result = db['users'].insert_one(user)
-    # user['_id'] = str(result.inserted_id)
+    # Insert user into MongoDB
+    result = db.users.insert_one(user)
+    user['_id'] = str(result.inserted_id)
     
     # Return user without password hash
     user_data = user.copy()
     user_data.pop('password_hash', None)
     
-    # Add to simulated users
-    get_all_users().append(user)
-    
     return user_data
 
 def get_user_by_id(user_id):
     """Get a user by ID"""
-    users = get_all_users()
-    for user in users:
-        if str(user.get('_id')) == str(user_id):
-            user_data = user.copy()
-            user_data.pop('password_hash', None)
-            return user_data
-    return None
-
-def get_user_by_username(username):
-    """Get a user by username"""
-    users = get_all_users()
-    for user in users:
-        if user.get('username') == username:
-            return user
-    return None
-
-def get_user_by_email(email):
-    """Get a user by email"""
-    users = get_all_users()
-    for user in users:
-        if user.get('email') == email:
-            return user
-    return None
-
-def authenticate_user(username_or_email, password):
-    """Authenticate a user with username/email and password"""
-    # Try to find user by username or email
-    user = get_user_by_username(username_or_email) or get_user_by_email(username_or_email)
+    from bson.objectid import ObjectId
     
-    if not user:
-        return None
+    try:
+        user = db.users.find_one({'_id': ObjectId(user_id)})
+    except:
+        # If not a valid ObjectId, try as a string (for backwards compatibility)
+        user = db.users.find_one({'_id': user_id})
     
-    # Check password
-    if user.get('password_hash') == hash_password(password):
-        # Return user without password hash
+    if user:
+        user['_id'] = str(user['_id'])
         user_data = user.copy()
         user_data.pop('password_hash', None)
         return user_data
     
     return None
+
+def get_user_by_username(username):
+    """Get a user by username"""
+    user = db.users.find_one({'username': username})
+    if user:
+        user['_id'] = str(user['_id'])
+    return user
+
+def get_user_by_email(email):
+    """Get a user by email"""
+    user = db.users.find_one({'email': email})
+    if user:
+        user['_id'] = str(user['_id'])
+    return user
+
+def authenticate_user(username_or_email, password):
+    """Authenticate a user with username/email and password"""
+    print(f"Attempting to authenticate: {username_or_email}")
+    
+    # Try to find user by username or email
+    user = db.users.find_one({
+        '$or': [
+            {'username': username_or_email},
+            {'email': username_or_email}
+        ]
+    })
+    
+    if not user:
+        print(f"No user found with username/email: {username_or_email}")
+        return None
+    
+    print(f"User found: {user.get('username')}")
+    
+    # Convert ObjectId to string
+    user['_id'] = str(user['_id'])
+    
+    # Check password
+    input_hash = hash_password(password)
+    stored_hash = user.get('password_hash')
+    print(f"Input password hash: {input_hash[:10]}...")
+    print(f"Stored password hash: {stored_hash[:10]}...")
+    
+    if input_hash == stored_hash:
+        print("Password match successful!")
+        # Return user without password hash
+        user_data = user.copy()
+        user_data.pop('password_hash', None)
+        
+        try:
+            # Update last login time
+            from bson.objectid import ObjectId
+            db.users.update_one(
+                {'_id': ObjectId(user['_id'])},
+                {'$set': {'last_login': get_timestamp()}}
+            )
+            print("Updated last login time")
+        except Exception as e:
+            print(f"Error updating last login time: {e}")
+        
+        return user_data
+    else:
+        print("Password does not match")
+        return None
 
 def generate_token(user_id):
     """Generate a JWT token for a user"""
@@ -116,30 +148,11 @@ def verify_token(token):
         return None
 
 def get_all_users():
-    """Get all users (simulated)"""
-    # This would typically query the database
-    # For demo purposes, we'll use a static list
-    return [
-        {
-            '_id': '1',
-            'username': 'farmer1',
-            'email': 'farmer1@example.com',
-            'password_hash': hash_password('password123'),
-            'name': 'John Farmer',
-            'phone': '+254712345678',
-            'role': 'farmer',
-            'created_at': '2023-01-01T00:00:00.000Z',
-            'updated_at': '2023-01-01T00:00:00.000Z'
-        },
-        {
-            '_id': '2',
-            'username': 'admin',
-            'email': 'admin@example.com',
-            'password_hash': hash_password('admin123'),
-            'name': 'Admin User',
-            'phone': '+254787654321',
-            'role': 'admin',
-            'created_at': '2023-01-01T00:00:00.000Z',
-            'updated_at': '2023-01-01T00:00:00.000Z'
-        }
-    ]
+    """Get all users from MongoDB"""
+    users = list(db.users.find())
+    
+    # Convert ObjectId to string for each user
+    for user in users:
+        user['_id'] = str(user['_id'])
+    
+    return users

@@ -66,6 +66,8 @@ def login():
     username_or_email = data.get('username') or data.get('email')
     password = data.get('password')
     
+    print(f"Login attempt for: {username_or_email}")
+    
     if not username_or_email or not password:
         return jsonify({'error': 'Username/email and password are required'}), 400
     
@@ -73,7 +75,10 @@ def login():
     user = user_model.authenticate_user(username_or_email, password)
     
     if not user:
+        print(f"Authentication failed for: {username_or_email}")
         return jsonify({'error': 'Invalid credentials'}), 401
+    
+    print(f"Authentication successful for: {username_or_email}")
     
     # Generate token
     token = user_model.generate_token(user['_id'])

@@ -75,7 +75,7 @@ function ExternalWeatherWidget() {
         fontSize: '14px'
       }}>
         <div>
-          <strong>Location:</strong> {weather.name}
+          <strong>Location:</strong>{weather.name}, {weather.sys.country}
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '5px' }}>
           <div>

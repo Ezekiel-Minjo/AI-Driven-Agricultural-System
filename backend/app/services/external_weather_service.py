@@ -12,6 +12,57 @@ class ExternalWeatherService:
         
         # For simulation, we'll use local data
         self.simulated = True
+        
+        # Kenya's 47 counties with approximate coordinates
+        self.kenya_counties = {
+            (0.5167, 35.2833): "Baringo",
+            (0.6667, 37.2500): "Embu",
+            (1.6000, 40.3000): "Garissa",
+            (-0.2333, 34.7500): "Homa Bay",
+            (-0.2167, 37.7500): "Machakos",
+            (-0.5383, 39.4521): "Kilifi",
+            (-3.3623, 38.5623): "Kwale",
+            (-0.4547, 39.6583): "Mombasa",
+            (-1.2864, 36.8172): "Nairobi",
+            (-1.5167, 37.2667): "Makueni",
+            (-0.7500, 37.2833): "Kitui",
+            (-0.3031, 34.7519): "Kisumu",
+            (-0.3333, 34.9833): "Kericho",
+            (0.3667, 34.7833): "Nandi",
+            (0.5667, 35.3000): "Uasin Gishu",
+            (0.0500, 37.6500): "Meru",
+            (0.4167, 37.7000): "Tharaka-Nithi",
+            (0.2833, 37.8333): "Isiolo",
+            (1.1000, 40.0000): "Marsabit",
+            (2.9833, 39.9833): "Mandera",
+            (0.4500, 39.6500): "Wajir",
+            (0.0333, 35.7167): "Nakuru",
+            (-0.6667, 34.7667): "Kisii",
+            (-3.2167, 40.1167): "Lamu",
+            (-0.3833, 36.9500): "Nyeri",
+            (-0.5333, 37.4500): "Kirinyaga",
+            (0.4000, 35.7333): "Laikipia",
+            (1.0167, 35.0000): "West Pokot",
+            (0.8667, 34.7500): "Trans Nzoia",
+            (1.7500, 37.5833): "Samburu",
+            (0.0167, 34.5833): "Kakamega",
+            (-0.2000, 37.3000): "Murang'a",
+            (-0.8833, 35.1833): "Bomet",
+            (-0.7833, 35.5833): "Narok",
+            (-1.7667, 37.6833): "Kajiado",
+            (-0.1333, 36.0000): "Nyandarua",
+            (-0.3700, 34.5100): "Vihiga",
+            (0.0167, 34.9000): "Bungoma",
+            (-0.4717, 39.3553): "Taita-Taveta",
+            (0.2833, 34.7500): "Busia",
+            (0.1167, 35.2500): "Elgeyo-Marakwet",
+            (1.5167, 35.6000): "Turkana",
+            (-1.0333, 36.8667): "Kiambu",
+            (-0.3833, 34.5000): "Siaya",
+            (-0.8789, 36.5250): "Tana River",
+            (-1.1667, 38.3333): "Nyamira",
+            (-0.9667, 37.0833): "Migori"
+        }
     
     def get_weather_by_coordinates(self, lat, lon):
         """Get current weather by coordinates"""
@@ -28,6 +79,20 @@ class ExternalWeatherService:
         
         response = requests.get(self.base_url, params=params)
         return response.json()
+    
+    def _get_location_name(self, lat, lon):
+        """Get the name of the closest county based on coordinates"""
+        closest_county = "Nairobi"  # Default to Nairobi
+        closest_distance = float('inf')
+        
+        for coords, name in self.kenya_counties.items():
+            # Simple distance calculation (not accounting for Earth's curvature)
+            distance = ((lat - coords[0])**2 + (lon - coords[1])**2)**0.5
+            if distance < closest_distance:
+                closest_distance = distance
+                closest_county = name
+        
+        return closest_county
     
     def _get_simulated_weather(self, lat, lon):
         """Generate simulated weather data"""
@@ -86,6 +151,9 @@ class ExternalWeatherService:
         else:
             cloudiness = random.uniform(30, 100)
         
+        # Get the county name based on coordinates
+        location_name = self._get_location_name(lat, lon)
+        
         # Simulate API response structure
         return {
             'coord': {'lat': lat, 'lon': lon},
@@ -121,7 +189,7 @@ class ExternalWeatherService:
                 'sunset': int((datetime.now().replace(hour=18, minute=0, second=0)).timestamp())
             },
             'timezone': 10800,  # UTC+3 for Kenya
-            'name': 'Simulated Location',
+            'name': location_name,
             'cod': 200
         }
     

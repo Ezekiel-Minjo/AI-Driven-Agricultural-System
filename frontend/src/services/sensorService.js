@@ -4,10 +4,23 @@ import api from "./api";
 export const getSensors = async (farmerId = "farmer-001") => {
   try {
     const response = await api.get(`/sensors?farmer_id=${farmerId}`);
+
+    // Handle empty response data
+    if (
+      !response.data ||
+      (Array.isArray(response.data) && response.data.length === 0)
+    ) {
+      console.warn("No sensors found for this farmer");
+      // Return empty array instead of throwing
+      return [];
+    }
+
     return response.data;
   } catch (error) {
     console.error("Error fetching sensors:", error);
-    throw error;
+    // Instead of re-throwing the error, return an empty array
+    // This prevents the error from bubbling up and allows the app to use fallback data
+    return [];
   }
 };
 
@@ -16,10 +29,18 @@ export const getSensorData = async (sensorId, hours = 24) => {
     const response = await api.get(
       `/readings?sensor_id=${sensorId}&hours=${hours}`
     );
+
+    // Handle empty response data
+    if (!response.data) {
+      console.warn(`No data found for sensor: ${sensorId}`);
+      return [];
+    }
+
     return response.data;
   } catch (error) {
     console.error("Error fetching sensor data:", error);
-    throw error;
+    // Return empty array instead of throwing
+    return [];
   }
 };
 

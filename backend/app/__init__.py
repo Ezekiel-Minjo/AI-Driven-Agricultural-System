@@ -12,14 +12,19 @@ def create_app(config_class=Config):
     app.config.from_object(config_class)
     
     # Enable CORS
-    CORS(app)
+    CORS(app, origins=["http://localhost:5173"], supports_credentials=True)
     
     # Initialize MongoDB
     global mongo_client, db
     try:
         mongo_client = MongoClient(app.config['MONGO_URI'])
-        db = mongo_client.get_default_database()
-        print("MongoDB connected successfully")
+        # Explicitly specify database name instead of using get_default_database()
+        db_name = app.config['MONGO_URI'].split('/')[-1]
+        db = mongo_client[db_name]
+        
+        # Simple test to verify connection
+        mongo_client.admin.command('ping')
+        print(f"MongoDB connected successfully to database: {db_name}")
     except Exception as e:
         print(f"MongoDB connection error: {e}")
         # Allow app to run without MongoDB for development

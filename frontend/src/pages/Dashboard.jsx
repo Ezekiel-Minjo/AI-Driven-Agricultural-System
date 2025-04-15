@@ -36,23 +36,36 @@ function Dashboard() {
     const fetchData = async () => {
       try {
         setLoading(true);
+        setError(null); // Reset error state when fetching
 
         // Fetch sensors and sensor data
+        let sensorsData = [];
         try {
-          const sensorsData = await getSensors();
-          setSensors(sensorsData);
+          sensorsData = await getSensors();
 
-          if (sensorsData.length > 0 && !selectedSensor) {
-            setSelectedSensor(sensorsData[0].id);
+          // Check if we got empty data back and use fallback if needed
+          if (!sensorsData || sensorsData.length === 0) {
+            throw new Error("No sensors data received");
           }
 
-          const sensorDataPromises = sensorsData.map(sensor =>
-            getSensorData(sensor.id, selectedTimeframe).then(data => ({ [sensor.id]: data }))
-          );
+          setSensors(sensorsData);
 
-          const sensorDataResults = await Promise.all(sensorDataPromises);
-          const combinedSensorData = Object.assign({}, ...sensorDataResults);
-          setSensorData(combinedSensorData);
+          if (sensorsData.length > 0) {
+            if (!selectedSensor) {
+              setSelectedSensor(sensorsData[0].id);
+            }
+
+            // Fetch sensor data for each sensor
+            const sensorDataPromises = sensorsData.map(sensor =>
+              getSensorData(sensor.id, selectedTimeframe)
+                .then(data => ({ [sensor.id]: data }))
+                .catch(() => ({ [sensor.id]: [] })) // Handle individual sensor data fetch failures
+            );
+
+            const sensorDataResults = await Promise.all(sensorDataPromises);
+            const combinedSensorData = Object.assign({}, ...sensorDataResults);
+            setSensorData(combinedSensorData);
+          }
         } catch (sensorErr) {
           console.error("Error fetching sensor data:", sensorErr);
           // Fall back to hardcoded data
@@ -63,7 +76,9 @@ function Dashboard() {
           ];
 
           setSensors(hardcodedSensors);
-          setSelectedSensor('sensor-001');
+          if (!selectedSensor) {
+            setSelectedSensor('sensor-001');
+          }
 
           // Generate fake readings for each sensor
           const now = new Date();
@@ -96,6 +111,7 @@ function Dashboard() {
           });
 
           setSensorData(fakeReadings);
+          sensorsData = hardcodedSensors; // Use hardcoded sensors for the rest of the function
         }
 
         // Fetch alerts
@@ -218,20 +234,53 @@ function Dashboard() {
 
   // Extract latest readings for each sensor
   const getLatestReading = (sensorId, dataType) => {
-    if (!sensorData[sensorId] || !sensorData[sensorId].length) return { value: 0, unit: '' };
+    // Check if we have any data for this sensor
+    if (!sensorId || !sensorData[sensorId] || !sensorData[sensorId].length) {
+      console.log(`No data available for sensor: ${sensorId}, dataType: ${dataType}`);
+      return { value: 0, unit: dataType === 'temperature' ? '°C' : '%' };
+    }
 
-    const latestReading = sensorData[sensorId][sensorData[sensorId].length - 1];
+    // Log the data we're working with for debugging
+    console.log(`Data for sensor ${sensorId}:`, sensorData[sensorId][0]);
 
-    if (!latestReading || !latestReading.data) return { value: 0, unit: '' };
+    // Get the latest reading (assuming first in array is latest)
+    const latestReading = sensorData[sensorId][0];
 
+    // Safety check for data structure
+    if (!latestReading || !latestReading.data) {
+      console.log(`Missing data structure for sensor: ${sensorId}`);
+      return { value: 0, unit: dataType === 'temperature' ? '°C' : '%' };
+    }
+
+    // Check if the data has the specific type we're looking for
+    if (latestReading.data[dataType] === undefined) {
+      console.log(`Data type ${dataType} not found in sensor data:`, latestReading.data);
+
+      // Try to find any value in the data object that might be the reading
+      const possibleValues = Object.values(latestReading.data).filter(v =>
+        typeof v === 'number' || (typeof v === 'string' && !isNaN(parseFloat(v)))
+      );
+
+      if (possibleValues.length > 0) {
+        return {
+          value: Number(possibleValues[0]).toFixed(2),
+          unit: latestReading.data.unit || (dataType === 'temperature' ? '°C' : '%')
+        };
+      }
+
+      return { value: 0, unit: dataType === 'temperature' ? '°C' : '%' };
+    }
+
+    // Return the correctly formatted reading
     return {
-      value: Number(latestReading.data[dataType]?.toFixed(2) || 0), // Round to 2 decimal points
-      unit: latestReading.data.unit || ''
+      value: Number(latestReading.data[dataType]).toFixed(2),
+      unit: latestReading.data.unit || (dataType === 'temperature' ? '°C' : '%')
     };
   };
 
   // Get sensor type
   const getSensorType = (sensorId) => {
+    if (!sensorId) return '';
     const sensor = sensors.find(s => s.id === sensorId);
     return sensor ? sensor.type : '';
   };
@@ -264,9 +313,27 @@ function Dashboard() {
   const humiditySensor = sensors.find(s => s.type === 'humidity');
 
   // Get latest readings
-  const soilMoisture = soilMoistureSensor ? getLatestReading(soilMoistureSensor.id, 'soil_moisture') : { value: 0, unit: '%' };
-  const temperature = temperatureSensor ? getLatestReading(temperatureSensor.id, 'temperature') : { value: 0, unit: '°C' };
-  const humidity = humiditySensor ? getLatestReading(humiditySensor.id, 'humidity') : { value: 0, unit: '%' };
+  const soilMoisture = soilMoistureSensor
+    ? getLatestReading(soilMoistureSensor.id, 'soil_moisture')
+    : { value: 0, unit: '%' };
+
+  const temperature = temperatureSensor
+    ? getLatestReading(temperatureSensor.id, 'temperature')
+    : { value: 0, unit: '°C' };
+
+  const humidity = humiditySensor
+    ? getLatestReading(humiditySensor.id, 'humidity')
+    : { value: 0, unit: '%' };
+
+  // Debug logs to help identify issues
+  console.log("Debug - Sensors:", sensors);
+  console.log("Debug - Sensor types:", sensors.map(s => s.type));
+  console.log("Debug - SoilMoistureSensor:", soilMoistureSensor);
+  console.log("Debug - TemperatureSensor:", temperatureSensor);
+  console.log("Debug - HumiditySensor:", humiditySensor);
+  console.log("Debug - Soil moisture value:", soilMoisture);
+  console.log("Debug - Temperature value:", temperature);
+  console.log("Debug - Humidity value:", humidity);
 
   const actionableRecommendations = getActionableRecommendations();
 
